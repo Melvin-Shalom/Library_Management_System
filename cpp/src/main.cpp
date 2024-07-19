@@ -1,10 +1,43 @@
-#include "Library.h"
 #include <iostream>
 #include <vector>
-#include <limits>
+#include <string>
+#include <curl/curl.h>
 #include <iomanip>  // For std::setw and std::setfill
 
 using namespace std;
+
+// Function to handle HTTP responses
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    ((string*)userp)->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+// Function to send HTTP requests
+string sendHttpRequest(const string& url, const string& data = "", const string& method = "GET") {
+    CURL* curl;
+    CURLcode res;
+    string readBuffer;
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    curl = curl_easy_init();
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        if (method == "POST") {
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+        } else if (method == "DELETE") {
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+        }
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << endl;
+        }
+        curl_easy_cleanup(curl);
+    }
+    curl_global_cleanup();
+    return readBuffer;
+}
 
 void NewPart() {
     cout << "\nPress Enter to continue ...";
@@ -38,11 +71,10 @@ string formatId(const string& id) {
 }
 
 int main() {
-    Library library;
     int choice;
     string id, title, author;
     int year;
-    vector<Book> foundBooks; // Initialize vector here
+    vector<Book> foundBooks;
 
     do {
         printTitle();
@@ -56,14 +88,16 @@ int main() {
                 cout << "Enter Book ID: ";
                 cin >> id;
                 cout << "Enter Book Title: ";
-                cin.ignore(); // To ignore the newline character left in the buffer
+                cin.ignore();
                 getline(cin, title);
                 cout << "Enter Book Author: ";
                 getline(cin, author);
                 cout << "Enter Year of Publication: ";
                 cin >> year;
                 if (year >= 1000 && year <= 3000) {
-                    library.addBook(Book(formatId(id), title, author, year));
+                    string data = "{\"id\":\"" + formatId(id) + "\",\"title\":\"" + title + "\",\"author\":\"" + author + "\",\"year\":" + to_string(year) + "}";
+                    string response = sendHttpRequest("http://localhost:3000/api/books", data, "POST");
+                    cout << "Response: " << response << endl;
                 } else {
                     cout << "Invalid year!\n";
                 }
@@ -75,11 +109,8 @@ int main() {
                 clearConsole();
                 cout << "Enter Book ID to remove: ";
                 cin >> id;
-                if (library.removeBook(formatId(id))) {
-                    cout << "Book removed successfully!\n";
-                } else {
-                    cout << "Book not found!\n";
-                }
+                string response = sendHttpRequest("http://localhost:3000/api/books/" + formatId(id), "", "DELETE");
+                cout << "Response: " << response << endl;
                 cin.ignore();
                 NewPart();
                 break;
@@ -95,22 +126,25 @@ int main() {
                 cin >> searchType;
                 cin.ignore(); // To ignore the newline character left in the buffer
 
-                foundBooks.clear(); // Clear previous search results
+                foundBooks.clear();
                 switch (searchType) {
                     case 1:
                         cout << "\nEnter Book Title to find: ";
                         getline(cin, title);
-                        foundBooks = library.findBooks(title); // Assuming findBooks is used for title search
+                        response = sendHttpRequest("http://localhost:3000/api/books?title=" + title);
+                        // Process response to extract book details
                         break;
                     case 2:
                         cout << "\nEnter Book Author to find: ";
                         getline(cin, author);
-                        foundBooks = library.findBooks(author); // Use findBooks for author search
+                        response = sendHttpRequest("http://localhost:3000/api/books?author=" + author);
+                        // Process response to extract book details
                         break;
                     case 3:
                         cout << "\nEnter Year of Publication to find: ";
                         cin >> year;
-                        foundBooks = library.findBooks(to_string(year)); // Use findBooks for year search
+                        response = sendHttpRequest("http://localhost:3000/api/books?year=" + to_string(year));
+                        // Process response to extract book details
                         break;
                     default:
                         cout << "Invalid choice!\n";
@@ -118,12 +152,10 @@ int main() {
                         break;
                 }
 
-                if (foundBooks.empty()) {
+                if (response.empty()) {
                     cout << "No books found.\n";
                 } else {
-                    for (const auto& book : foundBooks) {
-                        cout << book.getId() << ": " << book.getTitle() << " by " << book.getAuthor() << " (" << book.getYear() << ")\n";
-                    }
+                    cout << response << endl;
                 }
                 cin.ignore();
                 NewPart();
@@ -141,10 +173,12 @@ int main() {
 
                 if (listOption == 1) {
                     cout << "Listing all books by ID:\n\n";
-                    library.listBooksById();
+                    response = sendHttpRequest("http://localhost:3000/api/books/list?sort=id");
+                    cout << response << endl;
                 } else if (listOption == 2) {
                     cout << "Listing all books by Year:\n\n";
-                    library.listBooksByYear();
+                    response = sendHttpRequest("http://localhost:3000/api/books/list?sort=year");
+                    cout << response << endl;
                 } else {
                     cout << "Invalid choice!\n";
                 }
