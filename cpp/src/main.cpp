@@ -206,7 +206,7 @@ int main() {
             }
 
             case 0:
-                cout << "\n\n\n\nExiting...\n";
+                cout << "\n\n\n\nExiting...\n\n\n\n\n";
                 NewPart();
                 clearConsole();
                 break;
