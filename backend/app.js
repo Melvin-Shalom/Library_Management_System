@@ -1,11 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const Book = require('./routes/book');
+const Book = require('./routes/book'); // Make sure this path is correct
 
 const app = express();
-app.use(bodyParser.json()); 
+app.use(bodyParser.json()); // Ensure JSON is parsed
 
+// Add a new book
 app.post('/api/books', async (req, res) => {
     try {
         const bookData = req.body;
@@ -24,8 +25,12 @@ app.post('/api/books', async (req, res) => {
 app.delete('/api/books/:id', async (req, res) => {
     try {
         const bookId = req.params.id;
-        await Book.findOneAndDelete({ id: bookId });
-        res.status(200).send('Book removed successfully');
+        const result = await Book.findOneAndDelete({ id: bookId }); // Assuming 'id' is the unique field
+        if (result) {
+            res.status(200).send('Book removed successfully');
+        } else {
+            res.status(404).send('Book not found');
+        }
     } catch (error) {
         res.status(500).send('Error removing book: ' + error.message);
     }
@@ -63,26 +68,26 @@ app.get('/api/books/list', async (req, res) => {
     }
 });
 
+console.log(`\n\nNote: Shut the Server using "Ctrl + C" or it will give error when killed incorrectly`)
+
 // Connect to MongoDB and start the server
 mongoose.connect('mongodb+srv://kazuki:89827156@trail-101.9qewedx.mongodb.net/?retryWrites=true&w=majority&appName=trail-101', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
 }).then(() => {
     const server = app.listen(3000, () => {
         console.log(`\n\n\nServer running on port 3000`);
         console.log(`Process ID: ${process.pid}`);
+        console.log(`\n\n\n`);
     });
 
     const shutdown = async () => {
-        console.log('\n\n\n\nShutting down gracefully...');
         try {
             await mongoose.disconnect();
             server.close(() => {
-                console.log('\n\nServer closed\n\n');
+                console.log('\n\n\n\nServer closed\n\n');
                 process.exit(0);
             });
         } catch (error) {
-            console.error('\n\nError during shutdown:', error);
+            console.error('\n\n\n\nError during shutdown:', error);
             process.exit(1);
         }
     };
