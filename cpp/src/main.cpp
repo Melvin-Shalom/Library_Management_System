@@ -1,8 +1,8 @@
 #include <iostream>
-#include <vector>
 #include <string>
+#include <json/json.h>
+#include <sstream> // For std::istringstream
 #include <curl/curl.h>
-#include <iomanip>  // For std::setw and std::setfill
 
 using namespace std;
 
@@ -24,6 +24,9 @@ string sendHttpRequest(const string& url, const string& data = "", const string&
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         if (method == "POST") {
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+            struct curl_slist* headers = nullptr;
+            headers = curl_slist_append(headers, "Content-Type: application/json");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         } else if (method == "DELETE") {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
@@ -37,6 +40,23 @@ string sendHttpRequest(const string& url, const string& data = "", const string&
     }
     curl_global_cleanup();
     return readBuffer;
+}
+
+void displayJson(const string& rawJson) {
+    Json::CharReaderBuilder readerBuilder;
+    Json::Value jsonData;
+    string errs;
+
+    // Create a string stream from the raw JSON string
+    istringstream s(rawJson);
+
+    // Parse JSON data from the string stream
+    if (Json::parseFromStream(readerBuilder, s, &jsonData, &errs)) {
+        cout << "Parsed JSON data:\n";
+        cout << jsonData.toStyledString() << endl;
+    } else {
+        cerr << "Failed to parse JSON: " << errs << endl;
+    }
 }
 
 void NewPart() {
@@ -74,8 +94,8 @@ int main() {
     int choice;
     string id, title, author;
     int year;
-    vector<Book> foundBooks;
-
+    string response;
+    
     do {
         printTitle();
         showMenu();
@@ -83,7 +103,7 @@ int main() {
         cin.ignore(); // To ignore the newline character left in the buffer
 
         switch (choice) {
-            case 1:
+            case 1: {
                 clearConsole();
                 cout << "Enter Book ID: ";
                 cin >> id;
@@ -96,7 +116,7 @@ int main() {
                 cin >> year;
                 if (year >= 1000 && year <= 3000) {
                     string data = "{\"id\":\"" + formatId(id) + "\",\"title\":\"" + title + "\",\"author\":\"" + author + "\",\"year\":" + to_string(year) + "}";
-                    string response = sendHttpRequest("http://localhost:3000/api/books", data, "POST");
+                    response = sendHttpRequest("http://localhost:3000/api/books", data, "POST");
                     cout << "Response: " << response << endl;
                 } else {
                     cout << "Invalid year!\n";
@@ -104,18 +124,20 @@ int main() {
                 cin.ignore();
                 NewPart();
                 break;
+            }
 
-            case 2:
+            case 2: {
                 clearConsole();
                 cout << "Enter Book ID to remove: ";
                 cin >> id;
-                string response = sendHttpRequest("http://localhost:3000/api/books/" + formatId(id), "", "DELETE");
+                response = sendHttpRequest("http://localhost:3000/api/books/" + formatId(id), "", "DELETE");
                 cout << "Response: " << response << endl;
                 cin.ignore();
                 NewPart();
                 break;
+            }
 
-            case 3:
+            case 3: {
                 clearConsole();
                 cout << "Choose search criteria:\n";
                 cout << "1. By Title\n";
@@ -126,29 +148,25 @@ int main() {
                 cin >> searchType;
                 cin.ignore(); // To ignore the newline character left in the buffer
 
-                foundBooks.clear();
                 switch (searchType) {
                     case 1:
                         cout << "\nEnter Book Title to find: ";
                         getline(cin, title);
                         response = sendHttpRequest("http://localhost:3000/api/books?title=" + title);
-                        // Process response to extract book details
                         break;
                     case 2:
                         cout << "\nEnter Book Author to find: ";
                         getline(cin, author);
                         response = sendHttpRequest("http://localhost:3000/api/books?author=" + author);
-                        // Process response to extract book details
                         break;
                     case 3:
                         cout << "\nEnter Year of Publication to find: ";
                         cin >> year;
                         response = sendHttpRequest("http://localhost:3000/api/books?year=" + to_string(year));
-                        // Process response to extract book details
                         break;
                     default:
                         cout << "Invalid choice!\n";
-                        NewPart();
+                        response = "";
                         break;
                 }
 
@@ -160,8 +178,9 @@ int main() {
                 cin.ignore();
                 NewPart();
                 break;
+            }
 
-            case 4:
+            case 4: {
                 clearConsole();
                 cout << "Choose an option:\n";
                 cout << "1. List Books by ID\n";
@@ -184,6 +203,7 @@ int main() {
                 }
                 NewPart();
                 break;
+            }
 
             case 0:
                 cout << "\n\n\n\nExiting...\n";
